@@ -1,0 +1,45 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <None Include="..\..\Bots_Mapache.uproject" />
+    <Filter Include="Source">
+      <UniqueIdentifier>{A0277239-658D-400E-A85D-303C9E6AE562}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Source\Bots_Mapache.Target.cs">
+      <Filter>Source</Filter>
+    </None>
+    <None Include="..\..\Source\Bots_MapacheEditor.Target.cs">
+      <Filter>Source</Filter>
+    </None>
+    <Filter Include="Config">
+      <UniqueIdentifier>{8F7AC118-6032-459C-B006-4DCA62EBCA8A}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Config\DefaultEditor.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultEngine.ini">
+      <Filter>Config</Filter>
+    </None>
+    <None Include="..\..\Config\DefaultGame.ini">
+      <Filter>Config</Filter>
+    </None>
+    <Filter Include="Source\Bots_Mapache">
+      <UniqueIdentifier>{FD5EEF74-EE95-45A4-A435-27D108AFCDD2}</UniqueIdentifier>
+    </Filter>
+    <None Include="..\..\Source\Bots_Mapache\Bots_Mapache.Build.cs">
+      <Filter>Source\Bots_Mapache</Filter>
+    </None>
+    <ClCompile Include="..\..\Source\Bots_Mapache\Bots_Mapache.cpp">
+      <Filter>Source\Bots_Mapache</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\Bots_Mapache\Bots_Mapache.h">
+      <Filter>Source\Bots_Mapache</Filter>
+    </ClInclude>
+    <ClCompile Include="..\..\Source\Bots_Mapache\Bots_MapacheGameModeBase.cpp">
+      <Filter>Source\Bots_Mapache</Filter>
+    </ClCompile>
+    <ClInclude Include="..\..\Source\Bots_Mapache\Bots_MapacheGameModeBase.h">
+      <Filter>Source\Bots_Mapache</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
