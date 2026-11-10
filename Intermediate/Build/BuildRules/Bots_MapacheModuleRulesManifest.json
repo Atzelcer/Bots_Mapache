@@ -1,8 +1,0 @@
-{
-	"SourceFiles": [
-		"C:\\ECOSISTEMA\\unrealEngine\\Bots_Mapache\\Source\\Bots_Mapache\\Bots_Mapache.Build.cs",
-		"C:\\ECOSISTEMA\\unrealEngine\\Bots_Mapache\\Source\\Bots_Mapache.Target.cs",
-		"C:\\ECOSISTEMA\\unrealEngine\\Bots_Mapache\\Source\\Bots_MapacheEditor.Target.cs"
-	],
-	"EngineVersion": "4.27.2"
-}

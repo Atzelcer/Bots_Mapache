@@ -361,3 +361,32 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+## ---------------------------------------------------------------
+## Unreal Engine: archivos que se autogeneran (no se suben)
+## ---------------------------------------------------------------
+
+# Carpetas generadas por el motor / compilacion
+Binaries/
+Intermediate/
+DerivedDataCache/
+Saved/
+
+# Proyecto de Visual Studio / VS Code (el .sln SI se sube, a pedido del equipo)
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.vscode/
+.idea/
+
+# Plugins del proyecto (si algun dia se agregan)
+Plugins/*/Binaries/
+Plugins/*/Intermediate/
+
+# Otros
+*.VC.db
+*.opensdf
+*.sdf
+*.suo
+*.xcodeproj
+*.xcworkspace
