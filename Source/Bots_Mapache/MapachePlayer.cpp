@@ -5,62 +5,74 @@
 #include "Components/InputComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Kismet/KismetMaterialLibrary.h"
+#include "Materials/MaterialParameterCollection.h"
 #include "PaperFlipbookComponent.h"
+#include "TimerManager.h"
+
+namespace
+{
+	constexpr float CapsuleRadius = 25.f;
+	constexpr float CapsuleHalfHeight = 30.f;
+	constexpr float SpriteFacingOffsetYaw = -90.f;
+	constexpr float MovedToleranceSquared = 1.f;
+	const TCHAR* OcclusionCollectionPath = TEXT("/Game/Materials/MPC_Occlusion.MPC_Occlusion");
+}
 
 AMapachePlayer::AMapachePlayer()
 {
-	// Sin Tick: todo se mueve por eventos de input. Mas liviano.
 	PrimaryActorTick.bCanEverTick = false;
 
-	GetCapsuleComponent()->InitCapsuleSize(25.f, 30.f);
+	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
+	GetMesh()->SetVisibility(false);
 
-	// El sprite no rota con el personaje; la direccion se muestra cambiando de Flipbook.
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 	GetCharacterMovement()->bOrientRotationToMovement = false;
 
-	// El Mesh 3D heredado de ACharacter no se usa (el mapache es un sprite).
-	GetMesh()->SetVisibility(false);
-	GetMesh()->SetHiddenInGame(true);
-
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->bUsePawnControlRotation = false;
+	CameraBoom->SetUsingAbsoluteRotation(true);
 	CameraBoom->bInheritPitch = false;
 	CameraBoom->bInheritYaw = false;
 	CameraBoom->bInheritRoll = false;
 	CameraBoom->bDoCollisionTest = false;
-	CameraBoom->SetUsingAbsoluteRotation(true);
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
-	FollowCamera->bUsePawnControlRotation = false;
 
 	Sprite = CreateDefaultSubobject<UPaperFlipbookComponent>(TEXT("Sprite"));
 	Sprite->SetupAttachment(RootComponent);
 	Sprite->SetUsingAbsoluteRotation(true);
-	Sprite->SetGenerateOverlapEvents(false);
 	Sprite->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	OcclusionCollection = TSoftObjectPtr<UMaterialParameterCollection>(FSoftObjectPath(OcclusionCollectionPath));
+
 	ApplyViewSettings();
+}
+
+void AMapachePlayer::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (OcclusionCollection.IsNull())
+	{
+		return;
+	}
+
+	LoadedOcclusionCollection = OcclusionCollection.LoadSynchronous();
+	if (LoadedOcclusionCollection)
+	{
+		UpdateOcclusion();
+		GetWorldTimerManager().SetTimer(OcclusionTimer, this, &AMapachePlayer::UpdateOcclusion, OcclusionUpdateInterval, true);
+	}
 }
 
 void AMapachePlayer::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
 	ApplyViewSettings();
-}
-
-void AMapachePlayer::ApplyViewSettings()
-{
-	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.f));
-	CameraBoom->TargetArmLength = ArmLength;
-	FollowCamera->SetFieldOfView(CameraFOV);
-
-	// El sprite mira de frente a la camara (su cara visible apunta a -Y, de ahi el -90)
-	// y se inclina un poco hacia ella.
-	Sprite->SetRelativeRotation(FRotator(0.f, CameraYaw - 90.f, SpriteTilt));
 }
 
 void AMapachePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -71,21 +83,55 @@ void AMapachePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAxis("MoveRight", this, &AMapachePlayer::MoveRight);
 }
 
-// El movimiento es relativo a la camara: W siempre va "hacia arriba" en pantalla.
 void AMapachePlayer::MoveForward(float Value)
 {
-	if (Value != 0.f)
-	{
-		const FRotationMatrix YawMatrix(FRotator(0.f, CameraYaw, 0.f));
-		AddMovementInput(YawMatrix.GetUnitAxis(EAxis::X), Value);
-	}
+	MoveRelativeToCamera(EAxis::X, Value);
 }
 
 void AMapachePlayer::MoveRight(float Value)
 {
-	if (Value != 0.f)
+	MoveRelativeToCamera(EAxis::Y, Value);
+}
+
+void AMapachePlayer::MoveRelativeToCamera(EAxis::Type Axis, float Value)
+{
+	if (FMath::IsNearlyZero(Value))
 	{
-		const FRotationMatrix YawMatrix(FRotator(0.f, CameraYaw, 0.f));
-		AddMovementInput(YawMatrix.GetUnitAxis(EAxis::Y), Value);
+		return;
 	}
+
+	const FRotationMatrix CameraYawMatrix(FRotator(0.f, CameraYaw, 0.f));
+	AddMovementInput(CameraYawMatrix.GetUnitAxis(Axis), Value);
+}
+
+void AMapachePlayer::ApplyViewSettings()
+{
+	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.f));
+	CameraBoom->TargetArmLength = ArmLength;
+	FollowCamera->SetFieldOfView(CameraFOV);
+
+	Sprite->SetRelativeRotation(FRotator(0.f, CameraYaw + SpriteFacingOffsetYaw, SpriteTilt));
+}
+
+FVector AMapachePlayer::GetCameraWorldLocation() const
+{
+	return CameraBoom->GetComponentLocation() - FRotator(CameraPitch, CameraYaw, 0.f).Vector() * ArmLength;
+}
+
+void AMapachePlayer::UpdateOcclusion()
+{
+	const FVector PlayerPos = GetActorLocation();
+	if (bHasLastOcclusionPos && FVector::DistSquared(PlayerPos, LastOcclusionPos) < MovedToleranceSquared)
+	{
+		return;
+	}
+
+	bHasLastOcclusionPos = true;
+	LastOcclusionPos = PlayerPos;
+
+	const FVector CameraPos = GetCameraWorldLocation();
+
+	UKismetMaterialLibrary::SetVectorParameterValue(this, LoadedOcclusionCollection, TEXT("PlayerPos"), FLinearColor(PlayerPos));
+	UKismetMaterialLibrary::SetVectorParameterValue(this, LoadedOcclusionCollection, TEXT("CameraPos"), FLinearColor(CameraPos));
+	UKismetMaterialLibrary::SetScalarParameterValue(this, LoadedOcclusionCollection, TEXT("HoleRadius"), HoleRadius);
 }

@@ -1,5 +1,3 @@
-// Jugador: el mapache. Camara isometrica fija + sprite 2D (Paper2D) en mundo 3D.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -7,8 +5,9 @@
 #include "MapachePlayer.generated.h"
 
 class UCameraComponent;
-class USpringArmComponent;
+class UMaterialParameterCollection;
 class UPaperFlipbookComponent;
+class USpringArmComponent;
 
 UCLASS()
 class BOTS_MAPACHE_API AMapachePlayer : public ACharacter
@@ -21,46 +20,55 @@ public:
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
 protected:
-	// Se llama al construir el actor y al cambiar propiedades en el editor.
+	virtual void BeginPlay() override;
 	virtual void OnConstruction(const FTransform& Transform) override;
 
-	// --- Camara (editables desde un Blueprint hijo o en la instancia del nivel) ---
-
-	/** Inclinacion de la camara. Negativo = mira hacia abajo. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camara")
-	float CameraPitch = -50.f;
+	float CameraPitch = -60.f;
 
-	/** Giro de la camara alrededor del mapache (0, -45, -90...). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camara")
 	float CameraYaw = -45.f;
 
-	/** Distancia de la camara al mapache. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camara", meta = (ClampMin = "100"))
-	float ArmLength = 1200.f;
+	float ArmLength = 2400.f;
 
-	/** Campo de vision. Bajo = menos deformacion (mas isometrico). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camara", meta = (ClampMin = "5", ClampMax = "120"))
-	float CameraFOV = 35.f;
+	float CameraFOV = 30.f;
 
-	// --- Sprite ---
-
-	/** Inclinacion del sprite hacia la camara para que no se vea aplastado. Si se inclina al reves, usa valor negativo. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sprite")
 	float SpriteTilt = 20.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oclusion")
+	TSoftObjectPtr<UMaterialParameterCollection> OcclusionCollection;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oclusion", meta = (ClampMin = "0"))
+	float HoleRadius = 150.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oclusion", meta = (ClampMin = "0.01"))
+	float OcclusionUpdateInterval = 0.05f;
 
 private:
 	void MoveForward(float Value);
 	void MoveRight(float Value);
+	void MoveRelativeToCamera(EAxis::Type Axis, float Value);
 
-	/** Aplica los valores de camara y sprite a los componentes. */
 	void ApplyViewSettings();
+	void UpdateOcclusion();
+	FVector GetCameraWorldLocation() const;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camara", meta = (AllowPrivateAccess = "true"))
-	USpringArmComponent* CameraBoom;
+	USpringArmComponent* CameraBoom = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camara", meta = (AllowPrivateAccess = "true"))
-	UCameraComponent* FollowCamera;
+	UCameraComponent* FollowCamera = nullptr;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sprite", meta = (AllowPrivateAccess = "true"))
-	UPaperFlipbookComponent* Sprite;
+	UPaperFlipbookComponent* Sprite = nullptr;
+
+	UPROPERTY(Transient)
+	UMaterialParameterCollection* LoadedOcclusionCollection = nullptr;
+
+	FTimerHandle OcclusionTimer;
+	FVector LastOcclusionPos = FVector::ZeroVector;
+	bool bHasLastOcclusionPos = false;
 };
