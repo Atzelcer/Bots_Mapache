@@ -4,9 +4,9 @@
 #include "GameFramework/Character.h"
 #include "MapachePlayer.generated.h"
 
+class UAnimSequence;
 class UCameraComponent;
 class UMaterialParameterCollection;
-class UPaperFlipbookComponent;
 class USpringArmComponent;
 
 UCLASS()
@@ -35,8 +35,32 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Camara", meta = (ClampMin = "5", ClampMax = "120"))
 	float CameraFOV = 30.f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Sprite")
-	float SpriteTilt = 20.f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Modelo")
+	float MeshYawOffset = -90.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Modelo", meta = (ClampMin = "0.01"))
+	float MeshScale = 150.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Modelo")
+	float MeshHeightOffset = 0.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Modelo", meta = (ClampMin = "0.1", ClampMax = "1.5"))
+	float CapsuleFit = 0.6f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Movimiento", meta = (ClampMin = "10"))
+	float WalkSpeed = 250.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash", meta = (ClampMin = "10"))
+	float DashSpeed = 900.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash", meta = (ClampMin = "0.05"))
+	float DashDuration = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Dash", meta = (ClampMin = "0"))
+	float DashCooldown = 0.8f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Animacion", meta = (ClampMin = "0.01"))
+	float AnimationUpdateInterval = 0.05f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Oclusion")
 	TSoftObjectPtr<UMaterialParameterCollection> OcclusionCollection;
@@ -48,11 +72,27 @@ protected:
 	float OcclusionUpdateInterval = 0.05f;
 
 private:
+	enum class EAnimState : uint8
+	{
+		None,
+		Idle,
+		Walk,
+		Dash
+	};
+
 	void MoveForward(float Value);
 	void MoveRight(float Value);
 	void MoveRelativeToCamera(EAxis::Type Axis, float Value);
 
+	void StartDash();
+	void EndDash();
+
 	void ApplyViewSettings();
+	void StartAnimation();
+	void UpdateAnimation();
+	void SetAnimState(EAnimState NewState);
+	void PlayClip(UAnimSequence* Clip, bool bLoop, float Rate);
+
 	void UpdateOcclusion();
 	FVector GetCameraWorldLocation() const;
 
@@ -62,13 +102,24 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camara", meta = (AllowPrivateAccess = "true"))
 	UCameraComponent* FollowCamera = nullptr;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Sprite", meta = (AllowPrivateAccess = "true"))
-	UPaperFlipbookComponent* Sprite = nullptr;
+	UPROPERTY()
+	UAnimSequence* IdleAnimation = nullptr;
+
+	UPROPERTY()
+	UAnimSequence* WalkAnimation = nullptr;
+
+	UPROPERTY()
+	UAnimSequence* DashAnimation = nullptr;
 
 	UPROPERTY(Transient)
 	UMaterialParameterCollection* LoadedOcclusionCollection = nullptr;
 
+	FTimerHandle AnimationTimer;
+	FTimerHandle DashTimer;
 	FTimerHandle OcclusionTimer;
 	FVector LastOcclusionPos = FVector::ZeroVector;
+	EAnimState AnimState = EAnimState::None;
+	float NextDashTime = 0.f;
 	bool bHasLastOcclusionPos = false;
+	bool bDashing = false;
 };
