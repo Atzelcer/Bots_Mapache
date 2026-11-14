@@ -49,6 +49,8 @@ AMapachePlayer::AMapachePlayer()
 
 	OcclusionCollection = TSoftObjectPtr<UMaterialParameterCollection>(FSoftObjectPath(OcclusionCollectionPath));
 
+	
+	bIsMoving = false;
 	ApplyViewSettings();
 }
 
@@ -56,6 +58,21 @@ void AMapachePlayer::BeginPlay()
 {
 	Super::BeginPlay();
 
+	Sprite->SetVisibility(true);
+	Sprite->SetHiddenInGame(false);
+
+	if (Sprite && Flipbooks.IdleDown)
+	{
+		Sprite->SetFlipbook(Flipbooks.IdleDown);
+		Sprite->PlayFromStart();
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error,
+			TEXT("Sprite o IdleDown no esta asignado"));
+	}
+
+	OnCharacterMovementUpdated.AddDynamic(this, &AMapachePlayer::Animate);
 	if (OcclusionCollection.IsNull())
 	{
 		return;
@@ -81,6 +98,7 @@ void AMapachePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &AMapachePlayer::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AMapachePlayer::MoveRight);
+	PlayerInputComponent->BindAxis("ZoomCamera", this, &AMapachePlayer::ZoomCamera);
 }
 
 void AMapachePlayer::MoveForward(float Value)
@@ -93,6 +111,22 @@ void AMapachePlayer::MoveRight(float Value)
 	MoveRelativeToCamera(EAxis::Y, Value);
 }
 
+void AMapachePlayer::ZoomCamera(float Value)
+{
+	if (FMath::IsNearlyZero(Value))
+	{
+		return;
+	}
+
+	CameraBoom->TargetArmLength -= Value * 100.f;
+
+	CameraBoom->TargetArmLength = FMath::Clamp(
+		CameraBoom->TargetArmLength,
+		500.f,
+		2400.f
+	);
+}
+
 void AMapachePlayer::MoveRelativeToCamera(EAxis::Type Axis, float Value)
 {
 	if (FMath::IsNearlyZero(Value))
@@ -102,6 +136,154 @@ void AMapachePlayer::MoveRelativeToCamera(EAxis::Type Axis, float Value)
 
 	const FRotationMatrix CameraYawMatrix(FRotator(0.f, CameraYaw, 0.f));
 	AddMovementInput(CameraYawMatrix.GetUnitAxis(Axis), Value);
+}
+
+void AMapachePlayer::SetCurrentAnimationDirection(FVector const& Velocity)
+{
+	const float x = Velocity.GetSafeNormal().X;
+	const float y = Velocity.GetSafeNormal().Y;
+
+	bIsMoving = x != 0.0f || y != 0.0f;
+
+	if (bIsMoving) {
+		if (y > 0.0f && (abs(x) < 0.5f || x == 0.0)) {
+			CurrentAnimationDirection = EAnimationDirection::Down;
+		}
+		else if(y > 0.5f && x < -0.5f) {
+			CurrentAnimationDirection = EAnimationDirection::DownRigth;
+		}
+		else if (y > 0.5f && x < -0.5f) {
+			CurrentAnimationDirection = EAnimationDirection::DownLeft;
+		}
+		else if (y < 0.5f && abs(x) > 0.5f) {
+			CurrentAnimationDirection = EAnimationDirection::Up;
+		}
+		else if (y < -0.5f && x > 0.5f) {
+			CurrentAnimationDirection = EAnimationDirection::UpperRigth;
+		}
+		else if (y < -0.5f && x < -0.5f) {
+			CurrentAnimationDirection = EAnimationDirection::UpperLeft;
+		}
+		else if (abs(y) < 0.5f && x < 0.0f) {
+			CurrentAnimationDirection = EAnimationDirection::Rigth;
+		}
+		else 
+		{
+			CurrentAnimationDirection = EAnimationDirection::Left;
+		}
+	}
+}
+
+void AMapachePlayer::Animate(float Deltatime, FVector OldLocation, FVector const OldVelocity)
+{
+	SetCurrentAnimationDirection(OldVelocity);
+
+	if (OldVelocity.Size() > 0.0f) {
+		switch (CurrentAnimationDirection) {
+		case EAnimationDirection::Up: 
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.WalkUp);
+			}
+			break;
+		case EAnimationDirection::Down: 
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.WalkDown);
+			}
+			break;
+		case EAnimationDirection::Left: 
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.WalkLeft);
+			}
+			break;
+		case EAnimationDirection::Rigth: 
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.WalkRigth);
+			}
+			break;
+		case EAnimationDirection::UpperLeft: 
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.WalkUpperLeft);
+			}
+			break;
+		case EAnimationDirection::UpperRigth: 
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.WalkUpperRigth);
+			}
+			break;
+		case EAnimationDirection::DownLeft: 
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.WalkDownLeft);
+			}
+			break;
+		case EAnimationDirection::DownRigth: 
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.WalkDownRigth);
+			}
+			break;
+		default:;
+		}
+	}
+	else {
+		switch (CurrentAnimationDirection) {
+		case EAnimationDirection::Up:
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.IdleUp);
+			}
+			break;
+		case EAnimationDirection::Down:
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.IdleDown);
+			}
+			break;
+		case EAnimationDirection::Left:
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.IdleLeft);
+			}
+			break;
+		case EAnimationDirection::Rigth:
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.IdleRigth);
+			}
+			break;
+		case EAnimationDirection::UpperLeft:
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.IdleUpperLeft);
+			}
+			break;
+		case EAnimationDirection::UpperRigth:
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.IdleUpperRigth);
+			}
+			break;
+		case EAnimationDirection::DownLeft:
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.IdleDownLeft);
+			}
+			break;
+		case EAnimationDirection::DownRigth:
+			if (Sprite)
+			{
+				Sprite->SetFlipbook(Flipbooks.IdleDownRigth);
+			}
+			break;
+		default:;
+		}
+	}
 }
 
 void AMapachePlayer::ApplyViewSettings()
