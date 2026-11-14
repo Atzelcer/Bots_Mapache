@@ -6,6 +6,7 @@
 #include "MapacheW_Creditos.h"
 #include "MapacheW_Ajustes.h"
 #include "MapacheW_EnJuego.h"
+#include "MapacheW_Historia.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/AudioComponent.h"
 #include "Components/ProgressBar.h"
@@ -63,6 +64,12 @@ AMapacheHUD::AMapacheHUD()
 	{
 		EnJuegoClass = EnJuegoBP.Class;
 	}
+
+	static ConstructorHelpers::FClassFinder<UUserWidget> HistoriaBP(TEXT("/Game/HUD/WBP_Historia"));
+	if (HistoriaBP.Succeeded())
+	{
+		HistoriaClass = HistoriaBP.Class;
+	}
 }
 
 void AMapacheHUD::BeginPlay()
@@ -97,6 +104,10 @@ void AMapacheHUD::BeginPlay()
 	if (!EnJuegoClass)
 	{
 		EnJuegoClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/HUD/WBP_EnJuego.WBP_EnJuego_C"));
+	}
+	if (!HistoriaClass)
+	{
+		HistoriaClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/HUD/WBP_Historia.WBP_Historia_C"));
 	}
 
 	ShowPrincipal();
@@ -400,18 +411,65 @@ UProgressBar* AMapacheHUD::GetBarEnergia() const
 	return EnJuegoWidget ? EnJuegoWidget->GetBarEnergia() : nullptr;
 }
 
+void AMapacheHUD::ShowHistoria()
+{
+	if (!HistoriaClass)
+	{
+		HistoriaClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/HUD/WBP_Historia.WBP_Historia_C"));
+	}
+
+	if (!HistoriaClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("MapacheHUD: HistoriaClass is null"));
+		ShowEnJuego();
+		return;
+	}
+
+	if (!HistoriaWidget)
+	{
+		HistoriaWidget = CreateWidget<UMapacheW_Historia>(GetWorld(), HistoriaClass);
+	}
+
+	if (!HistoriaWidget)
+	{
+		UE_LOG(LogTemp, Error, TEXT("MapacheHUD: failed to create HistoriaWidget"));
+		ShowEnJuego();
+		return;
+	}
+
+	if (!HistoriaWidget->IsInViewport())
+	{
+		HistoriaWidget->bIsFocusable = true;
+		HistoriaWidget->AddToViewport(20);
+	}
+
+	HistoriaWidget->ReiniciarHistoria();
+	SetUIInput(HistoriaWidget);
+}
+
+void AMapacheHUD::HideHistoria()
+{
+	if (HistoriaWidget)
+	{
+		HistoriaWidget->RemoveFromParent();
+		HistoriaWidget = nullptr;
+	}
+}
+
 void AMapacheHUD::StartNuevoJuego()
 {
 	HidePrincipal();
 	HideAjustes();
 	HidePause();
-	ShowEnJuego();
+	HideEnJuego();
+	ShowHistoria();
 }
 
 void AMapacheHUD::ReturnToPrincipal()
 {
 	HidePause();
 	HideEnJuego();
+	HideHistoria();
 	HideAjustes();
 	ShowPrincipal();
 }

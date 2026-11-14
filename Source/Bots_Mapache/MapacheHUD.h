@@ -11,6 +11,7 @@ class UMapacheW_GameOver;
 class UMapacheW_Creditos;
 class UMapacheW_Ajustes;
 class UMapacheW_EnJuego;
+class UMapacheW_Historia;
 class UProgressBar;
 class USoundBase;
 class UAudioComponent;
@@ -43,6 +44,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "UI|EnJuego")
 	TSubclassOf<UUserWidget> EnJuegoClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI|Historia")
+	TSubclassOf<UUserWidget> HistoriaClass;
+
 	UPROPERTY(EditDefaultsOnly, Category = "Audio|Principal")
 	USoundBase* PrincipalMusic = nullptr;
 
@@ -64,6 +68,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "UI")
 	UMapacheW_EnJuego* EnJuegoWidget = nullptr;
 
+	UPROPERTY(BlueprintReadOnly, Category = "UI")
+	UMapacheW_Historia* HistoriaWidget = nullptr;
+
 	void ShowPrincipal();
 	void HidePrincipal();
 
@@ -81,6 +88,9 @@ public:
 
 	void ShowEnJuego();
 	void HideEnJuego();
+
+	void ShowHistoria();
+	void HideHistoria();
 
 	void StartNuevoJuego();
 	void ReturnToPrincipal();
