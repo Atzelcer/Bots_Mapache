@@ -3,5 +3,5 @@
 
 ABots_MapacheGameModeBase::ABots_MapacheGameModeBase()
 {
-	DefaultPawnClass = AMapachePlayer::StaticClass();
+	/*DefaultPawnClass = AMapachePlayer::StaticClass();*/
 }

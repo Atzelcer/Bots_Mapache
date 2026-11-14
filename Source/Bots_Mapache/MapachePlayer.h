@@ -2,12 +2,17 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "ItemInterface.h"
+#include "Blueprint/UserWidget.h"
 #include "MapachePlayer.generated.h"
+
 
 class UAnimSequence;
 class UCameraComponent;
 class UMaterialParameterCollection;
 class USpringArmComponent;
+class UInventoryComponent;
+class UInventoryWidget;
 
 UCLASS()
 class BOTS_MAPACHE_API AMapachePlayer : public ACharacter
@@ -122,4 +127,33 @@ private:
 	float NextDashTime = 0.f;
 	bool bHasLastOcclusionPos = false;
 	bool bDashing = false;
+
+public:
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> InventoryWidgetClass;
+
+	UPROPERTY()
+	UInventoryWidget* InventoryWidget;
+
+	bool bInventoryVisible = false;
+	void ToogleInventory();
+
+
+	UPROPERTY()
+	TScriptInterface<IItemInterface> CurrentItem;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	float InventoryCursorSpeed = 0.5f;
+
+	void DoSomething();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	UInventoryComponent* InventoryComponent = nullptr;
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void AddItemToInventory(TScriptInterface<IItemInterface> Item);
+
+	UFUNCTION()
+	void OnObjectBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };
