@@ -8,6 +8,8 @@ class UAnimSequence;
 class UCameraComponent;
 class UMaterialParameterCollection;
 class USpringArmComponent;
+class UProgressBar;
+class UMapacheW_EnJuego;
 
 UCLASS()
 class BOTS_MAPACHE_API AMapachePlayer : public ACharacter
@@ -18,6 +20,27 @@ public:
 	AMapachePlayer();
 
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void BindEnJuegoUI(UMapacheW_EnJuego* Widget);
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Energia")
+	void SetEnergia(float Percent);
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Energia")
+	float GetEnergia() const { return Energia; }
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Energia")
+	UProgressBar* GetBarEnergia() const { return BarEnergia; }
+
+	UPROPERTY(BlueprintReadOnly, Category = "UI")
+	UMapacheW_EnJuego* EnJuegoWidget = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category = "UI|Energia")
+	UProgressBar* BarEnergia = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI|Energia", meta = (ClampMin = "0", ClampMax = "1"))
+	float Energia = 1.f;
 
 protected:
 	virtual void BeginPlay() override;

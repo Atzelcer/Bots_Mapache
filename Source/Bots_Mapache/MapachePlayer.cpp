@@ -1,9 +1,11 @@
 #include "MapachePlayer.h"
+#include "MapacheW_EnJuego.h"
 
 #include "Animation/AnimSequence.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
+#include "Components/ProgressBar.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -95,6 +97,26 @@ void AMapachePlayer::BeginPlay()
 	{
 		UpdateOcclusion();
 		GetWorldTimerManager().SetTimer(OcclusionTimer, this, &AMapachePlayer::UpdateOcclusion, OcclusionUpdateInterval, true);
+	}
+}
+
+void AMapachePlayer::BindEnJuegoUI(UMapacheW_EnJuego* Widget)
+{
+	EnJuegoWidget = Widget;
+	BarEnergia = Widget ? Widget->GetBarEnergia() : nullptr;
+}
+
+void AMapachePlayer::SetEnergia(float Percent)
+{
+	Energia = FMath::Clamp(Percent, 0.f, 1.f);
+
+	if (EnJuegoWidget)
+	{
+		EnJuegoWidget->SetEnergia(Energia);
+	}
+	else if (BarEnergia)
+	{
+		BarEnergia->SetPercent(Energia);
 	}
 }
 
