@@ -12,7 +12,7 @@
 class AMapachePlayer;
 
 UCLASS()
-class BOTS_MAPACHE_API AItem : public AActor ,public IItemInterface
+class BOTS_MAPACHE_API AItem : public AActor
 {
 	GENERATED_BODY()
 	
@@ -23,7 +23,7 @@ public:
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
-
+	void InitConfig(TCHAR* MeshPath);
 public:	
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
@@ -53,8 +53,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Item")
 	int32 MaxStack = 4;
-
-	virtual void Interact(AMapachePlayer* MapachePlayer) override;
 
 	UFUNCTION()
 	void OnItemOverlap(UPrimitiveComponent* OverlappedComponent,AActor* OtherActor,UPrimitiveComponent* OtherComp,int32 OtherBodyIndex,bool bFromSweep,const FHitResult& SweepResult);

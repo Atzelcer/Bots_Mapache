@@ -23,13 +23,13 @@ void UInventoryWidget::RefreshInventory(UInventoryComponent* Inventory)
         ItemIcon3
     };
 
-    UTextBlock* Names[4] =
+    /*UTextBlock* Names[4] =
     {
         ItemName0,
         ItemName1,
         ItemName2,
         ItemName3
-    };
+    };*/
 
     for (int32 i = 0; i < 4; i++)
     {
@@ -38,10 +38,10 @@ void UInventoryWidget::RefreshInventory(UInventoryComponent* Inventory)
             Icons[i]->SetVisibility(ESlateVisibility::Hidden);
         }
 
-        if (Names[i])
-        {
-            Names[i]->SetText(FText::GetEmpty());
-        }
+        //if (Names[i])
+        //{
+        //    Names[i]->SetText(FText::GetEmpty());
+        //}
 
         if (!Inventory->Items.IsValidIndex(i))
             continue;
@@ -57,9 +57,9 @@ void UInventoryWidget::RefreshInventory(UInventoryComponent* Inventory)
             Icons[i]->SetVisibility(ESlateVisibility::Visible);
         }
 
-        if (Names[i])
-        {
-            Names[i]->SetText(Item->Name);
-        }
+        //if (Names[i])
+        //{
+        //    Names[i]->SetText(Item->Name);
+        //}
     }
 }

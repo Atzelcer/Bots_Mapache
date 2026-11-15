@@ -31,17 +31,17 @@ public:
     UImage* ItemIcon3;
 
 
-    UPROPERTY(meta = (BindWidget))
-    UTextBlock* ItemName0;
+    //UPROPERTY(meta = (BindWidget))
+    //UTextBlock* ItemName0;
 
-    UPROPERTY(meta = (BindWidget))
-    UTextBlock* ItemName1;
+    //UPROPERTY(meta = (BindWidget))
+    //UTextBlock* ItemName1;
 
-    UPROPERTY(meta = (BindWidget))
-    UTextBlock* ItemName2;
+    //UPROPERTY(meta = (BindWidget))
+    //UTextBlock* ItemName2;
 
-    UPROPERTY(meta = (BindWidget))
-    UTextBlock* ItemName3;
+    //UPROPERTY(meta = (BindWidget))
+    //UTextBlock* ItemName3;
 
 
     UFUNCTION(BlueprintCallable)

@@ -13,6 +13,7 @@ class UMaterialParameterCollection;
 class USpringArmComponent;
 class UInventoryComponent;
 class UInventoryWidget;
+class UCurrentInventoryWidget;
 
 UCLASS()
 class BOTS_MAPACHE_API AMapachePlayer : public ACharacter
@@ -136,9 +137,29 @@ public:
 	UPROPERTY()
 	UInventoryWidget* InventoryWidget;
 
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> CurrentInventoryWidgetClass;
+
+	UPROPERTY()
+	UCurrentInventoryWidget* CurrentInventoryWidget;
+
 	bool bInventoryVisible = false;
 	void ToogleInventory();
 
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void ChoseInventory(int32 Location);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void OpenInventory(APlayerController* PC);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void CloseInventory(APlayerController* PC);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void ShowInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void HideInventory();
 
 	UPROPERTY()
 	TScriptInterface<IItemInterface> CurrentItem;
@@ -150,6 +171,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
 	UInventoryComponent* InventoryComponent = nullptr;
+
+	int32 GetMaxSlots();
+	int32 GetAvaibleInventory();
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void AddItemToInventory(TScriptInterface<IItemInterface> Item);

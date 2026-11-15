@@ -4,9 +4,7 @@
 #include "Item.h"
 #include "MapachePlayer.h"
 // Sets default values
-namespace {
-    const TCHAR* MeshPath = TEXT("/Game/UI/Item/orange/Orange.Orange");
-}
+
 AItem::AItem()
 {
 
@@ -31,14 +29,15 @@ AItem::AItem()
 
     ItemMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ItemMesh"));
     ItemMesh->SetupAttachment(RootComponent);
+}
 
+void AItem::InitConfig(TCHAR* MeshPath)
+{
     static ConstructorHelpers::FObjectFinder<UStaticMesh> MeshFinder(MeshPath);
-
     if (MeshFinder.Succeeded())
     {
         ItemMesh->SetStaticMesh(MeshFinder.Object);
     }
-
     ItemMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 }
 
@@ -65,23 +64,22 @@ void AItem::OnConstruction(const FTransform& Transform)
     }
 }
 
-void AItem::Interact(AMapachePlayer* MapachePlayer)
-{
-    UE_LOG(LogTemp, Warning, TEXT("Interactuando con: %s"), *Name.ToString());
-}
-
 void AItem::OnItemOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
     if (AMapachePlayer* Player = Cast<AMapachePlayer>(OtherActor))
     {
-        if (this->GetClass()->ImplementsInterface(UItemInterface::StaticClass()))
+        int32 AvaibleInventory = Player->GetAvaibleInventory();
+
+        if (this->GetClass()->ImplementsInterface(UItemInterface::StaticClass()) && (AvaibleInventory > 0))
         {
             TScriptInterface<IItemInterface> ItemInterface;
 
             ItemInterface.SetObject(this);
             ItemInterface.SetInterface(Cast<IItemInterface>(this));
             Player->AddItemToInventory(ItemInterface);
-            this->Destroy();
+ 
+            SetActorHiddenInGame(true);
+            SetActorEnableCollision(false);
         }
     }
 }

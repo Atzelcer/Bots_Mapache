@@ -53,14 +53,32 @@ void UInventoryComponent::AddItem(TScriptInterface<IItemInterface> InItem)
 void UInventoryComponent::RemoveItem(TScriptInterface<IItemInterface> InItem)
 {
 	if (!InItem) return;
+	AActor* ItemActor = Cast<AActor>(InItem.GetObject());
 
 	for (auto It = Items.CreateIterator(); It; ++It)
 	{
 		if (It->GetObject() == InItem.GetObject())
 		{
 			It.RemoveCurrent();
+
+			if (IsValid(ItemActor))
+			{
+				ItemActor->Destroy();
+			}
 			break;
 		}
 	}
 }
 
+TScriptInterface<IItemInterface> UInventoryComponent::GetItemByIndex(int32 Index)
+{
+	TScriptInterface<IItemInterface> Item;
+
+	if (Items.IsValidIndex(Index))
+	{
+		Item = Items[Index];
+		//Items.RemoveAt(Index);
+	}
+
+	return Item;
+}

@@ -37,4 +37,7 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void RemoveItem(TScriptInterface<IItemInterface> InItem);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	TScriptInterface<IItemInterface> GetItemByIndex(int32 Index);
 };
