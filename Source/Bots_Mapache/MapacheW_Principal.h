@@ -23,6 +23,9 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	UButton* BtnSalir = nullptr;
 
+	UPROPERTY(meta = (BindWidgetOptional))
+	UButton* BtnCreditos = nullptr;
+
 	UFUNCTION()
 	void OnNuevoJuegoClicked();
 
@@ -31,4 +34,7 @@ protected:
 
 	UFUNCTION()
 	void OnSalirClicked();
+
+	UFUNCTION()
+	void OnCreditosClicked();
 };

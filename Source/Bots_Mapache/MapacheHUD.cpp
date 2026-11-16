@@ -7,6 +7,7 @@
 #include "MapacheW_Ajustes.h"
 #include "MapacheW_EnJuego.h"
 #include "MapacheW_Historia.h"
+#include "MapacheW_Carga.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/AudioComponent.h"
 #include "Components/ProgressBar.h"
@@ -70,6 +71,12 @@ AMapacheHUD::AMapacheHUD()
 	{
 		HistoriaClass = HistoriaBP.Class;
 	}
+
+	static ConstructorHelpers::FClassFinder<UUserWidget> CargaBP(TEXT("/Game/HUD/WBP_Carga"));
+	if (CargaBP.Succeeded())
+	{
+		CargaClass = CargaBP.Class;
+	}
 }
 
 void AMapacheHUD::BeginPlay()
@@ -108,6 +115,10 @@ void AMapacheHUD::BeginPlay()
 	if (!HistoriaClass)
 	{
 		HistoriaClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/HUD/WBP_Historia.WBP_Historia_C"));
+	}
+	if (!CargaClass)
+	{
+		CargaClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/HUD/WBP_Carga.WBP_Carga_C"));
 	}
 
 	ShowPrincipal();
@@ -194,6 +205,28 @@ void AMapacheHUD::StopPrincipalMusic()
 	if (PrincipalAudioComponent && PrincipalAudioComponent->IsPlaying())
 	{
 		PrincipalAudioComponent->Stop();
+	}
+}
+
+void AMapacheHUD::PausarMusicaPrincipal()
+{
+	if (PrincipalAudioComponent && PrincipalAudioComponent->IsPlaying())
+	{
+		PrincipalAudioComponent->SetPaused(true);
+	}
+}
+
+void AMapacheHUD::ReanudarMusicaPrincipal()
+{
+	if (!PrincipalAudioComponent)
+	{
+		return;
+	}
+
+	PrincipalAudioComponent->SetPaused(false);
+	if (!PrincipalAudioComponent->IsPlaying())
+	{
+		PlayPrincipalMusic();
 	}
 }
 
@@ -293,23 +326,129 @@ void AMapacheHUD::HidePause()
 
 void AMapacheHUD::ShowGameOver()
 {
+	HidePause();
+
+	if (!GameOverClass)
+	{
+		GameOverClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/HUD/WBP_GameOver.WBP_GameOver_C"));
+	}
+
+	if (!GameOverClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("MapacheHUD: GameOverClass is null"));
+		return;
+	}
+
+	if (!GameOverWidget)
+	{
+		GameOverWidget = CreateWidget<UMapacheW_GameOver>(GetWorld(), GameOverClass);
+	}
+
+	if (!GameOverWidget)
+	{
+		UE_LOG(LogTemp, Error, TEXT("MapacheHUD: failed to create GameOverWidget"));
+		return;
+	}
+
+	if (!GameOverWidget->IsInViewport())
+	{
+		GameOverWidget->bIsFocusable = true;
+		GameOverWidget->AddToViewport(50);
+	}
+
+	UGameplayStatics::SetGamePaused(GetWorld(), true);
+	bIsPaused = true;
+	SetUIInput(GameOverWidget);
 }
 
 void AMapacheHUD::HideGameOver()
 {
+	if (GameOverWidget)
+	{
+		GameOverWidget->RemoveFromParent();
+		GameOverWidget = nullptr;
+	}
+
+	UGameplayStatics::SetGamePaused(GetWorld(), false);
+	bIsPaused = false;
 }
 
 void AMapacheHUD::ShowCreditos()
 {
+	if (PrincipalWidget)
+	{
+		PrincipalWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	if (!CreditosClass)
+	{
+		CreditosClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/HUD/WBP_Creditos.WBP_Creditos_C"));
+	}
+
+	if (!CreditosClass)
+	{
+		return;
+	}
+
+	if (!CreditosWidget)
+	{
+		CreditosWidget = CreateWidget<UMapacheW_Creditos>(GetWorld(), CreditosClass);
+	}
+
+	if (CreditosWidget && !CreditosWidget->IsInViewport())
+	{
+		CreditosWidget->AddToViewport(30);
+	}
+
+	if (CreditosWidget)
+	{
+		SetUIInput(CreditosWidget);
+	}
+
+	ReanudarMusicaPrincipal();
 }
 
 void AMapacheHUD::HideCreditos()
 {
+	if (CreditosWidget)
+	{
+		CreditosWidget->RemoveFromParent();
+		CreditosWidget = nullptr;
+	}
+}
+
+void AMapacheHUD::CerrarCreditos()
+{
+	HideCreditos();
+
+	if (PrincipalWidget && PrincipalWidget->IsInViewport())
+	{
+		PrincipalWidget->SetVisibility(ESlateVisibility::Visible);
+		SetUIInput(PrincipalWidget);
+		ReanudarMusicaPrincipal();
+	}
+	else
+	{
+		ShowPrincipal();
+	}
 }
 
 void AMapacheHUD::ShowAjustes()
 {
-	HidePrincipal();
+	bAjustesDesdePausa = PauseWidget && PauseWidget->IsInViewport() && PauseWidget->GetVisibility() == ESlateVisibility::Visible;
+	if (!bAjustesDesdePausa && PrincipalWidget && PrincipalWidget->IsInViewport())
+	{
+		PausarMusicaPrincipal();
+	}
+
+	if (PrincipalWidget)
+	{
+		PrincipalWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	if (PauseWidget)
+	{
+		PauseWidget->SetVisibility(ESlateVisibility::Collapsed);
+	}
 
 	if (!AjustesClass)
 	{
@@ -323,9 +462,21 @@ void AMapacheHUD::ShowAjustes()
 
 	if (AjustesWidget && !AjustesWidget->IsInViewport())
 	{
-		AjustesWidget->AddToViewport(10);
+		AjustesWidget->AddToViewport(40);
 		SetUIInput(AjustesWidget);
 	}
+	else if (AjustesWidget)
+	{
+		SetUIInput(AjustesWidget);
+	}
+}
+
+void AMapacheHUD::GuardarAjustes(float NuevoVolumen, float NuevoBrillo, bool bNuevoMute)
+{
+	VolumenGuardado = FMath::Clamp(NuevoVolumen, 0.f, 1.f);
+	BrilloGuardado = FMath::Clamp(NuevoBrillo, 0.f, 1.f);
+	bMuteGuardado = bNuevoMute;
+	bAjustesGuardados = true;
 }
 
 void AMapacheHUD::HideAjustes()
@@ -335,6 +486,31 @@ void AMapacheHUD::HideAjustes()
 		AjustesWidget->RemoveFromParent();
 		AjustesWidget = nullptr;
 	}
+}
+
+void AMapacheHUD::CerrarAjustes()
+{
+	const bool bVolverAPausa = bAjustesDesdePausa;
+	bAjustesDesdePausa = false;
+	HideAjustes();
+
+	if (bVolverAPausa && PauseWidget && PauseWidget->IsInViewport())
+	{
+		PauseWidget->SetVisibility(ESlateVisibility::Visible);
+		SetUIInput(PauseWidget);
+		return;
+	}
+
+	ReanudarMusicaPrincipal();
+
+	if (PrincipalWidget && PrincipalWidget->IsInViewport())
+	{
+		PrincipalWidget->SetVisibility(ESlateVisibility::Visible);
+		SetUIInput(PrincipalWidget);
+		return;
+	}
+
+	ShowPrincipal();
 }
 
 void AMapacheHUD::ShowEnJuego()
@@ -456,20 +632,84 @@ void AMapacheHUD::HideHistoria()
 	}
 }
 
+void AMapacheHUD::ShowCarga()
+{
+	if (!CargaClass)
+	{
+		CargaClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/HUD/WBP_Carga.WBP_Carga_C"));
+	}
+
+	if (!CargaClass)
+	{
+		UE_LOG(LogTemp, Error, TEXT("MapacheHUD: CargaClass is null"));
+		return;
+	}
+
+	if (!CargaWidget)
+	{
+		CargaWidget = CreateWidget<UMapacheW_Carga>(GetWorld(), CargaClass);
+	}
+
+	if (!CargaWidget)
+	{
+		UE_LOG(LogTemp, Error, TEXT("MapacheHUD: failed to create CargaWidget"));
+		return;
+	}
+
+	if (!CargaWidget->IsInViewport())
+	{
+		CargaWidget->bIsFocusable = true;
+		CargaWidget->AddToViewport(100);
+	}
+
+	CargaWidget->IniciarCarga();
+	SetUIInput(CargaWidget);
+}
+
+void AMapacheHUD::HideCarga()
+{
+	if (CargaWidget)
+	{
+		CargaWidget->RemoveFromParent();
+		CargaWidget = nullptr;
+	}
+}
+
+void AMapacheHUD::SetCargaProgreso(float Percent)
+{
+	if (CargaWidget)
+	{
+		CargaWidget->SetProgreso(Percent);
+	}
+}
+
+void AMapacheHUD::SetCargaEstado(const FText& NuevoEstado)
+{
+	if (CargaWidget)
+	{
+		CargaWidget->SetEstado(NuevoEstado);
+	}
+}
+
 void AMapacheHUD::StartNuevoJuego()
 {
 	HidePrincipal();
+	HideCreditos();
 	HideAjustes();
 	HidePause();
 	HideEnJuego();
+	HideCarga();
 	ShowHistoria();
 }
 
 void AMapacheHUD::ReturnToPrincipal()
 {
 	HidePause();
+	HideGameOver();
 	HideEnJuego();
 	HideHistoria();
+	HideCarga();
 	HideAjustes();
+	HideCreditos();
 	ShowPrincipal();
 }

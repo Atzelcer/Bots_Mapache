@@ -33,6 +33,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI|Energia")
 	UProgressBar* GetBarEnergia() const { return BarEnergia; }
 
+	UFUNCTION(BlueprintCallable, Category = "UI|GameOver")
+	void OnAtrapado();
+
+	UFUNCTION(BlueprintCallable, Category = "UI|GameOver")
+	bool EstaAtrapado() const { return bAtrapado; }
+
 	UPROPERTY(BlueprintReadOnly, Category = "UI")
 	UMapacheW_EnJuego* EnJuegoWidget = nullptr;
 
@@ -41,6 +47,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI|Energia", meta = (ClampMin = "0", ClampMax = "1"))
 	float Energia = 1.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "UI|GameOver")
+	bool bAtrapado = false;
 
 protected:
 	virtual void BeginPlay() override;

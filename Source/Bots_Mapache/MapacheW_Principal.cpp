@@ -23,6 +23,11 @@ void UMapacheW_Principal::NativeConstruct()
 	{
 		BtnSalir->OnClicked.AddDynamic(this, &UMapacheW_Principal::OnSalirClicked);
 	}
+
+	if (BtnCreditos)
+	{
+		BtnCreditos->OnClicked.AddDynamic(this, &UMapacheW_Principal::OnCreditosClicked);
+	}
 }
 
 void UMapacheW_Principal::OnNuevoJuegoClicked()
@@ -52,6 +57,21 @@ void UMapacheW_Principal::OnAjustesClicked()
 	if (HUD)
 	{
 		HUD->ShowAjustes();
+	}
+}
+
+void UMapacheW_Principal::OnCreditosClicked()
+{
+	APlayerController* PC = GetOwningPlayer();
+	if (!PC)
+	{
+		return;
+	}
+
+	AMapacheHUD* HUD = Cast<AMapacheHUD>(PC->GetHUD());
+	if (HUD)
+	{
+		HUD->ShowCreditos();
 	}
 }
 

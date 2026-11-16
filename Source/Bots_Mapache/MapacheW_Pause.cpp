@@ -51,7 +51,6 @@ void UMapacheW_Pause::OnAjustesClicked()
 	AMapacheHUD* HUD = Cast<AMapacheHUD>(PC->GetHUD());
 	if (HUD)
 	{
-		HUD->HidePause();
 		HUD->ShowAjustes();
 	}
 }

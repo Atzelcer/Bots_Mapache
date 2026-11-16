@@ -1,7 +1,9 @@
 #include "MapachePlayer.h"
+#include "MapacheHUD.h"
 #include "MapacheW_EnJuego.h"
 
 #include "Animation/AnimSequence.h"
+#include "GameFramework/PlayerController.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
@@ -104,6 +106,11 @@ void AMapachePlayer::BindEnJuegoUI(UMapacheW_EnJuego* Widget)
 {
 	EnJuegoWidget = Widget;
 	BarEnergia = Widget ? Widget->GetBarEnergia() : nullptr;
+
+	if (Widget)
+	{
+		bAtrapado = false;
+	}
 }
 
 void AMapachePlayer::SetEnergia(float Percent)
@@ -117,6 +124,28 @@ void AMapachePlayer::SetEnergia(float Percent)
 	else if (BarEnergia)
 	{
 		BarEnergia->SetPercent(Energia);
+	}
+}
+
+void AMapachePlayer::OnAtrapado()
+{
+	if (bAtrapado)
+	{
+		return;
+	}
+
+	bAtrapado = true;
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	AMapacheHUD* HUD = Cast<AMapacheHUD>(PC->GetHUD());
+	if (HUD)
+	{
+		HUD->ShowGameOver();
 	}
 }
 
