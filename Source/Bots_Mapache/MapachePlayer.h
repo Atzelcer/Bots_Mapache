@@ -2,7 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "ItemInterface.h"
+#include "Blueprint/UserWidget.h"
 #include "MapachePlayer.generated.h"
+
 
 class UAnimSequence;
 class UCameraComponent;
@@ -10,6 +13,9 @@ class UMaterialParameterCollection;
 class USpringArmComponent;
 class UProgressBar;
 class UMapacheW_EnJuego;
+class UInventoryComponent;
+class UInventoryWidget;
+class UCurrentInventoryWidget;
 
 UCLASS()
 class BOTS_MAPACHE_API AMapachePlayer : public ACharacter
@@ -145,4 +151,56 @@ private:
 	float NextDashTime = 0.f;
 	bool bHasLastOcclusionPos = false;
 	bool bDashing = false;
+
+public:
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> InventoryWidgetClass;
+
+	UPROPERTY()
+	UInventoryWidget* InventoryWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> CurrentInventoryWidgetClass;
+
+	UPROPERTY()
+	UCurrentInventoryWidget* CurrentInventoryWidget;
+
+	bool bInventoryVisible = false;
+	void ToogleInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void ChoseInventory(int32 Location);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void OpenInventory(APlayerController* PC);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void CloseInventory(APlayerController* PC);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void ShowInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void HideInventory();
+
+	UPROPERTY()
+	TScriptInterface<IItemInterface> CurrentItem;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	float InventoryCursorSpeed = 0.5f;
+
+	void DoSomething();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	UInventoryComponent* InventoryComponent = nullptr;
+
+	int32 GetMaxSlots();
+	int32 GetAvaibleInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void AddItemToInventory(TScriptInterface<IItemInterface> Item);
+
+	UFUNCTION()
+	void OnObjectBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };
