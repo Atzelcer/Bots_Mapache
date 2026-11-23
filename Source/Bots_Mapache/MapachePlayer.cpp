@@ -9,10 +9,14 @@
 #include "Components/InputComponent.h"
 #include "Components/ProgressBar.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/SphereComponent.h"
 #include "Engine/SkeletalMesh.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "GameFramework/RootMotionSource.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "InputCoreTypes.h"
+#include "Interactable.h"
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "TimerManager.h"
@@ -32,11 +36,13 @@ namespace
 	constexpr int32 DashPriority = 5;
 	const TCHAR* OcclusionCollectionPath = TEXT("/Game/Materials/MPC_Occlusion.MPC_Occlusion");
 	const TCHAR* MeshPath = TEXT("/Game/Raccoon/Mapache_Caminar.Mapache_Caminar");
+	const TCHAR* IdleAnimationPath = TEXT("/Game/Raccoon/Mapache_Idle_solo_animacion.Mapache_Idle_solo_animacion");
 	const TCHAR* WalkAnimationPath = TEXT("/Game/Raccoon/Mapache_Caminar_Anim.Mapache_Caminar_Anim");
+	const TCHAR* RunAnimationPath = TEXT("/Game/Raccoon/Mapache_Correr_solo_animacion.Mapache_Correr_solo_animacion");
 	const TCHAR* DashAnimationPath = TEXT("/Game/Raccoon/Mapache_Dash_solo_animacion.Mapache_Dash_solo_animacion");
-	const TCHAR* IdleAnimationPath = TEXT("/Game/Raccoon/Mapache_Idle.Mapache_Idle");
-	const TCHAR* WidgetInventoryPath = TEXT("/Game/UI/WBP_Inventory.WBP_Inventory");
-	const TCHAR* WidgetCurrentInventoryPath = TEXT("/Game/UI/WBP_CurrentInventory.WBP_CurrentInventory");
+	const TCHAR* DigAnimationPath = TEXT("/Game/Raccoon/Mapache_Escarbar_solo_animacion.Mapache_Escarbar_solo_animacion");
+	const TCHAR* WidgetInventoryPath = TEXT("/Game/UI/WBP_Inventory.WBP_Inventory_C");
+	const TCHAR* WidgetCurrentInventoryPath = TEXT("/Game/UI/WBP_CurrentInventory.WBP_CurrentInventory_C");
 }
 
 AMapachePlayer::AMapachePlayer()
@@ -64,10 +70,22 @@ AMapachePlayer::AMapachePlayer()
 		GetMesh()->SetSkeletalMesh(MeshFinder.Object);
 	}
 
+	static ConstructorHelpers::FObjectFinder<UAnimSequence> IdleFinder(IdleAnimationPath);
+	if (IdleFinder.Succeeded())
+	{
+		IdleAnimation = IdleFinder.Object;
+	}
+
 	static ConstructorHelpers::FObjectFinder<UAnimSequence> WalkFinder(WalkAnimationPath);
 	if (WalkFinder.Succeeded())
 	{
 		WalkAnimation = WalkFinder.Object;
+	}
+
+	static ConstructorHelpers::FObjectFinder<UAnimSequence> RunFinder(RunAnimationPath);
+	if (RunFinder.Succeeded())
+	{
+		RunAnimation = RunFinder.Object;
 	}
 
 	static ConstructorHelpers::FClassFinder<UUserWidget> WidgeBP(WidgetInventoryPath);
@@ -86,7 +104,23 @@ AMapachePlayer::AMapachePlayer()
 		DashAnimation = DashFinder.Object;
 	}
 
+	static ConstructorHelpers::FObjectFinder<UAnimSequence> DigFinder(DigAnimationPath);
+	if (DigFinder.Succeeded())
+	{
+		DigAnimation = DigFinder.Object;
+	}
+
 	GetMesh()->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+
+	InteractionSphere = CreateDefaultSubobject<USphereComponent>(TEXT("InteractionSphere"));
+	InteractionSphere->SetupAttachment(RootComponent);
+	InteractionSphere->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	InteractionSphere->SetCollisionObjectType(ECC_Pawn);
+	InteractionSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
+	InteractionSphere->SetCollisionResponseToChannel(ECC_WorldDynamic, ECR_Overlap);
+	InteractionSphere->SetGenerateOverlapEvents(true);
+	InteractionSphere->OnComponentBeginOverlap.AddDynamic(this, &AMapachePlayer::OnInteractionBegin);
+	InteractionSphere->OnComponentEndOverlap.AddDynamic(this, &AMapachePlayer::OnInteractionEnd);
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
@@ -199,6 +233,9 @@ void AMapachePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAxis("MoveForward", this, &AMapachePlayer::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AMapachePlayer::MoveRight);
 	PlayerInputComponent->BindAction("Dash", IE_Pressed, this, &AMapachePlayer::StartDash);
+	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMapachePlayer::TryInteract);
+	PlayerInputComponent->BindKey(EKeys::LeftShift, IE_Pressed, this, &AMapachePlayer::StartRun);
+	PlayerInputComponent->BindKey(EKeys::LeftShift, IE_Released, this, &AMapachePlayer::StopRun);
 	PlayerInputComponent->BindAction("Inventory", IE_Pressed, this, &AMapachePlayer::ToogleInventory);
 	PlayerInputComponent->BindAction("DoSomething", IE_Pressed, this, &AMapachePlayer::DoSomething);
 }
@@ -224,10 +261,29 @@ void AMapachePlayer::MoveRelativeToCamera(EAxis::Type Axis, float Value)
 	AddMovementInput(CameraYawMatrix.GetUnitAxis(Axis), Value);
 }
 
+void AMapachePlayer::StartRun()
+{
+	bRunning = true;
+	ApplySpeed();
+	UpdateAnimation();
+}
+
+void AMapachePlayer::StopRun()
+{
+	bRunning = false;
+	ApplySpeed();
+	UpdateAnimation();
+}
+
+void AMapachePlayer::ApplySpeed()
+{
+	GetCharacterMovement()->MaxWalkSpeed = bRunning ? RunSpeed : WalkSpeed;
+}
+
 void AMapachePlayer::StartDash()
 {
 	UWorld* World = GetWorld();
-	if (bDashing || !World || World->GetTimeSeconds() < NextDashTime)
+	if (bDashing || bInteracting || !World || World->GetTimeSeconds() < NextDashTime)
 	{
 		return;
 	}
@@ -246,6 +302,8 @@ void AMapachePlayer::StartDash()
 
 	SetActorRotation(Direction.Rotation());
 
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+
 	TSharedPtr<FRootMotionSource_ConstantForce> DashForce = MakeShared<FRootMotionSource_ConstantForce>();
 	DashForce->InstanceName = TEXT("MapacheDash");
 	DashForce->AccumulateMode = ERootMotionAccumulateMode::Override;
@@ -253,8 +311,8 @@ void AMapachePlayer::StartDash()
 	DashForce->Force = Direction * DashSpeed;
 	DashForce->Duration = DashDuration;
 	DashForce->FinishVelocityParams.Mode = ERootMotionFinishVelocityMode::ClampVelocity;
-	DashForce->FinishVelocityParams.ClampVelocity = WalkSpeed;
-	GetCharacterMovement()->ApplyRootMotionSource(DashForce);
+	DashForce->FinishVelocityParams.ClampVelocity = Movement->MaxWalkSpeed;
+	Movement->ApplyRootMotionSource(DashForce);
 
 	SetAnimState(EAnimState::Dash);
 	GetWorldTimerManager().SetTimer(DashTimer, this, &AMapachePlayer::EndDash, DashDuration, false);
@@ -267,13 +325,110 @@ void AMapachePlayer::EndDash()
 	UpdateAnimation();
 }
 
+void AMapachePlayer::TryInteract()
+{
+	if (bInteracting || bDashing)
+	{
+		return;
+	}
+
+	AActor* Best = nullptr;
+	float BestDistance = TNumericLimits<float>::Max();
+	for (const TWeakObjectPtr<AActor>& Candidate : NearbyInteractables)
+	{
+		AActor* Actor = Candidate.Get();
+		const IInteractable* Interactable = Cast<IInteractable>(Actor);
+		if (!Interactable || !Interactable->CanInteract(this))
+		{
+			continue;
+		}
+
+		const float Distance = FVector::DistSquared(Actor->GetActorLocation(), GetActorLocation());
+		if (Distance < BestDistance)
+		{
+			BestDistance = Distance;
+			Best = Actor;
+		}
+	}
+
+	if (!Best)
+	{
+		return;
+	}
+
+	IInteractable* Interactable = Cast<IInteractable>(Best);
+	const float Duration = Interactable->GetInteractionDuration();
+	if (Duration <= 0.f)
+	{
+		Interactable->Interact(this);
+		return;
+	}
+
+	bInteracting = true;
+	InteractionTarget = Best;
+
+	GetCharacterMovement()->StopMovementImmediately();
+	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	{
+		PlayerController->SetIgnoreMoveInput(true);
+	}
+
+	FVector ToTarget = Best->GetActorLocation() - GetActorLocation();
+	ToTarget.Z = 0.f;
+	if (ToTarget.Normalize())
+	{
+		SetActorRotation(ToTarget.Rotation());
+	}
+
+	SetAnimState(EAnimState::Dig);
+	GetWorldTimerManager().SetTimer(InteractionTimer, this, &AMapachePlayer::FinishInteraction, Duration, false);
+}
+
+void AMapachePlayer::FinishInteraction()
+{
+	bInteracting = false;
+
+	if (APlayerController* PlayerController = Cast<APlayerController>(GetController()))
+	{
+		PlayerController->SetIgnoreMoveInput(false);
+	}
+
+	if (IInteractable* Interactable = Cast<IInteractable>(InteractionTarget.Get()))
+	{
+		Interactable->Interact(this);
+	}
+	InteractionTarget.Reset();
+
+	AnimState = EAnimState::None;
+	UpdateAnimation();
+}
+
+void AMapachePlayer::OnInteractionBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	if (OtherActor && OtherActor != this && Cast<IInteractable>(OtherActor))
+	{
+		NearbyInteractables.AddUnique(OtherActor);
+	}
+}
+
+void AMapachePlayer::OnInteractionEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	NearbyInteractables.Remove(OtherActor);
+}
+
 void AMapachePlayer::ApplyViewSettings()
 {
 	CameraBoom->SetRelativeRotation(FRotator(CameraPitch, CameraYaw, 0.f));
 	CameraBoom->TargetArmLength = ArmLength;
 	FollowCamera->SetFieldOfView(CameraFOV);
 
-	GetCharacterMovement()->MaxWalkSpeed = WalkSpeed;
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	Movement->MaxWalkSpeed = bRunning ? RunSpeed : WalkSpeed;
+	Movement->MaxStepHeight = MaxStepHeight;
+	Movement->SetWalkableFloorAngle(MaxWalkableAngle);
+	Movement->bUseFlatBaseForFloorChecks = true;
+
+	InteractionSphere->SetSphereRadius(InteractionRadius);
 
 	const FRotator MeshRotation(0.f, MeshYawOffset, 0.f);
 
@@ -286,8 +441,8 @@ void AMapachePlayer::ApplyViewSettings()
 		const FBoxSphereBounds Bounds = Model->GetBounds();
 		const FVector Extent = Bounds.BoxExtent * MeshScale;
 
-		Radius = FMath::Max(Extent.X, Extent.Y) * CapsuleFit;
-		HalfHeight = FMath::Max(Extent.Z, Radius);
+		HalfHeight = Extent.Z;
+		Radius = FMath::Min(FMath::Max(Extent.X, Extent.Y) * CapsuleFit, HalfHeight);
 
 		const FVector ScaledCenter = MeshRotation.RotateVector(FVector(Bounds.Origin.X, Bounds.Origin.Y, 0.f)) * MeshScale;
 		const float ScaledBottom = (Bounds.Origin.Z - Bounds.BoxExtent.Z) * MeshScale;
@@ -309,21 +464,24 @@ void AMapachePlayer::StartAnimation()
 		return;
 	}
 
-	IdleAnimation = LoadObject<UAnimSequence>(nullptr, IdleAnimationPath, nullptr, LOAD_NoWarn | LOAD_Quiet);
-
 	UpdateAnimation();
 	GetWorldTimerManager().SetTimer(AnimationTimer, this, &AMapachePlayer::UpdateAnimation, AnimationUpdateInterval, true);
 }
 
 void AMapachePlayer::UpdateAnimation()
 {
-	if (bDashing)
+	if (bDashing || bInteracting)
 	{
 		return;
 	}
 
-	const bool bMoving = GetVelocity().SizeSquared2D() > MovingSpeedSquared;
-	SetAnimState(bMoving ? EAnimState::Walk : EAnimState::Idle);
+	if (GetVelocity().SizeSquared2D() <= MovingSpeedSquared)
+	{
+		SetAnimState(EAnimState::Idle);
+		return;
+	}
+
+	SetAnimState(bRunning ? EAnimState::Run : EAnimState::Walk);
 }
 
 void AMapachePlayer::SetAnimState(EAnimState NewState)
@@ -340,8 +498,14 @@ void AMapachePlayer::SetAnimState(EAnimState NewState)
 	case EAnimState::Walk:
 		PlayClip(WalkAnimation, true, 1.f);
 		break;
+	case EAnimState::Run:
+		PlayClip(RunAnimation ? RunAnimation : WalkAnimation, true, 1.f);
+		break;
 	case EAnimState::Dash:
 		PlayClip(DashAnimation, false, DashAnimation ? DashAnimation->GetPlayLength() / DashDuration : 1.f);
+		break;
+	case EAnimState::Dig:
+		PlayClip(DigAnimation, true, 1.f);
 		break;
 	case EAnimState::Idle:
 		if (IdleAnimation)
