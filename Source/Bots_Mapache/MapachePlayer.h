@@ -2,13 +2,21 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "ItemInterface.h"
+#include "Blueprint/UserWidget.h"
 #include "MapachePlayer.generated.h"
+
 
 class UAnimSequence;
 class UCameraComponent;
 class UMaterialParameterCollection;
 class USphereComponent;
 class USpringArmComponent;
+class UProgressBar;
+class UMapacheW_EnJuego;
+class UInventoryComponent;
+class UInventoryWidget;
+class UCurrentInventoryWidget;
 
 UCLASS()
 class BOTS_MAPACHE_API AMapachePlayer : public ACharacter
@@ -19,6 +27,36 @@ public:
 	AMapachePlayer();
 
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void BindEnJuegoUI(UMapacheW_EnJuego* Widget);
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Energia")
+	void SetEnergia(float Percent);
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Energia")
+	float GetEnergia() const { return Energia; }
+
+	UFUNCTION(BlueprintCallable, Category = "UI|Energia")
+	UProgressBar* GetBarEnergia() const { return BarEnergia; }
+
+	UFUNCTION(BlueprintCallable, Category = "UI|GameOver")
+	void OnAtrapado();
+
+	UFUNCTION(BlueprintCallable, Category = "UI|GameOver")
+	bool EstaAtrapado() const { return bAtrapado; }
+
+	UPROPERTY(BlueprintReadOnly, Category = "UI")
+	UMapacheW_EnJuego* EnJuegoWidget = nullptr;
+
+	UPROPERTY(BlueprintReadOnly, Category = "UI|Energia")
+	UProgressBar* BarEnergia = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI|Energia", meta = (ClampMin = "0", ClampMax = "1"))
+	float Energia = 1.f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "UI|GameOver")
+	bool bAtrapado = false;
 
 protected:
 	virtual void BeginPlay() override;
@@ -165,4 +203,56 @@ private:
 	bool bDashing = false;
 	bool bRunning = false;
 	bool bInteracting = false;
+
+public:
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> InventoryWidgetClass;
+
+	UPROPERTY()
+	UInventoryWidget* InventoryWidget;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<UUserWidget> CurrentInventoryWidgetClass;
+
+	UPROPERTY()
+	UCurrentInventoryWidget* CurrentInventoryWidget;
+
+	bool bInventoryVisible = false;
+	void ToogleInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void ChoseInventory(int32 Location);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void OpenInventory(APlayerController* PC);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void CloseInventory(APlayerController* PC);
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void ShowInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void HideInventory();
+
+	UPROPERTY()
+	TScriptInterface<IItemInterface> CurrentItem;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	float InventoryCursorSpeed = 0.5f;
+
+	void DoSomething();
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Inventory")
+	UInventoryComponent* InventoryComponent = nullptr;
+
+	int32 GetMaxSlots();
+	int32 GetAvaibleInventory();
+
+	UFUNCTION(BlueprintCallable, Category = "Inventory")
+	void AddItemToInventory(TScriptInterface<IItemInterface> Item);
+
+	UFUNCTION()
+	void OnObjectBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
 };

@@ -1,9 +1,13 @@
 #include "MapachePlayer.h"
+#include "MapacheHUD.h"
+#include "MapacheW_EnJuego.h"
 
 #include "Animation/AnimSequence.h"
+#include "GameFramework/PlayerController.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/InputComponent.h"
+#include "Components/ProgressBar.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "Engine/SkeletalMesh.h"
@@ -16,6 +20,10 @@
 #include "Kismet/KismetMaterialLibrary.h"
 #include "Materials/MaterialParameterCollection.h"
 #include "TimerManager.h"
+#include "InventoryComponent.h"
+#include "GameFramework/PlayerController.h"
+#include "InventoryWidget.h"
+#include "CurrentInventoryWidget.h"
 #include "UObject/ConstructorHelpers.h"
 
 namespace
@@ -33,6 +41,8 @@ namespace
 	const TCHAR* RunAnimationPath = TEXT("/Game/Raccoon/Mapache_Correr_solo_animacion.Mapache_Correr_solo_animacion");
 	const TCHAR* DashAnimationPath = TEXT("/Game/Raccoon/Mapache_Dash_solo_animacion.Mapache_Dash_solo_animacion");
 	const TCHAR* DigAnimationPath = TEXT("/Game/Raccoon/Mapache_Escarbar_solo_animacion.Mapache_Escarbar_solo_animacion");
+	const TCHAR* WidgetInventoryPath = TEXT("/Game/UI/WBP_Inventory.WBP_Inventory_C");
+	const TCHAR* WidgetCurrentInventoryPath = TEXT("/Game/UI/WBP_CurrentInventory.WBP_CurrentInventory_C");
 }
 
 AMapachePlayer::AMapachePlayer()
@@ -40,6 +50,11 @@ AMapachePlayer::AMapachePlayer()
 	PrimaryActorTick.bCanEverTick = false;
 
 	GetCapsuleComponent()->InitCapsuleSize(CapsuleRadius, CapsuleHalfHeight);
+	GetCapsuleComponent()->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	GetCapsuleComponent()->SetCollisionObjectType(ECC_Pawn);
+	GetCapsuleComponent()->SetCollisionResponseToChannel(ECC_WorldDynamic,ECR_Overlap);
+	GetCapsuleComponent()->SetGenerateOverlapEvents(true);
+	GetCapsuleComponent()->OnComponentBeginOverlap.AddDynamic(this, &AMapachePlayer::OnObjectBeginOverlap);
 
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -71,6 +86,16 @@ AMapachePlayer::AMapachePlayer()
 	if (RunFinder.Succeeded())
 	{
 		RunAnimation = RunFinder.Object;
+	}
+
+	static ConstructorHelpers::FClassFinder<UUserWidget> WidgeBP(WidgetInventoryPath);
+	if (WidgeBP.Class) {
+		InventoryWidgetClass = WidgeBP.Class;
+	}
+
+	static ConstructorHelpers::FClassFinder<UUserWidget> WidgeCurrentBP(WidgetCurrentInventoryPath);
+	if (WidgeCurrentBP.Class) {
+		CurrentInventoryWidgetClass = WidgeCurrentBP.Class;
 	}
 
 	static ConstructorHelpers::FObjectFinder<UAnimSequence> DashFinder(DashAnimationPath);
@@ -109,7 +134,7 @@ AMapachePlayer::AMapachePlayer()
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 
 	OcclusionCollection = TSoftObjectPtr<UMaterialParameterCollection>(FSoftObjectPath(OcclusionCollectionPath));
-
+	InventoryComponent = CreateDefaultSubobject<UInventoryComponent>(TEXT("InventoryComponent"));
 	ApplyViewSettings();
 }
 
@@ -130,6 +155,69 @@ void AMapachePlayer::BeginPlay()
 		UpdateOcclusion();
 		GetWorldTimerManager().SetTimer(OcclusionTimer, this, &AMapachePlayer::UpdateOcclusion, OcclusionUpdateInterval, true);
 	}
+
+	if (InventoryWidgetClass) {
+		InventoryWidget = CreateWidget<UInventoryWidget>(GetWorld(), InventoryWidgetClass);
+		if (InventoryWidget) {
+			InventoryWidget->AddToViewport(1);
+			InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+
+	if (CurrentInventoryWidgetClass) {
+		CurrentInventoryWidget = CreateWidget<UCurrentInventoryWidget>(GetWorld(), CurrentInventoryWidgetClass);
+		if (CurrentInventoryWidget) {
+			CurrentInventoryWidget->AddToViewport(0);
+			CurrentInventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+	}
+}
+
+void AMapachePlayer::BindEnJuegoUI(UMapacheW_EnJuego* Widget)
+{
+	EnJuegoWidget = Widget;
+	BarEnergia = Widget ? Widget->GetBarEnergia() : nullptr;
+
+	if (Widget)
+	{
+		bAtrapado = false;
+	}
+}
+
+void AMapachePlayer::SetEnergia(float Percent)
+{
+	Energia = FMath::Clamp(Percent, 0.f, 1.f);
+
+	if (EnJuegoWidget)
+	{
+		EnJuegoWidget->SetEnergia(Energia);
+	}
+	else if (BarEnergia)
+	{
+		BarEnergia->SetPercent(Energia);
+	}
+}
+
+void AMapachePlayer::OnAtrapado()
+{
+	if (bAtrapado)
+	{
+		return;
+	}
+
+	bAtrapado = true;
+
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC)
+	{
+		return;
+	}
+
+	AMapacheHUD* HUD = Cast<AMapacheHUD>(PC->GetHUD());
+	if (HUD)
+	{
+		HUD->ShowGameOver();
+	}
 }
 
 void AMapachePlayer::OnConstruction(const FTransform& Transform)
@@ -148,6 +236,8 @@ void AMapachePlayer::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 	PlayerInputComponent->BindAction("Interact", IE_Pressed, this, &AMapachePlayer::TryInteract);
 	PlayerInputComponent->BindKey(EKeys::LeftShift, IE_Pressed, this, &AMapachePlayer::StartRun);
 	PlayerInputComponent->BindKey(EKeys::LeftShift, IE_Released, this, &AMapachePlayer::StopRun);
+	PlayerInputComponent->BindAction("Inventory", IE_Pressed, this, &AMapachePlayer::ToogleInventory);
+	PlayerInputComponent->BindAction("DoSomething", IE_Pressed, this, &AMapachePlayer::DoSomething);
 }
 
 void AMapachePlayer::MoveForward(float Value)
@@ -447,6 +537,136 @@ void AMapachePlayer::PlayClip(UAnimSequence* Clip, bool bLoop, float Rate)
 FVector AMapachePlayer::GetCameraWorldLocation() const
 {
 	return CameraBoom->GetComponentLocation() - FRotator(CameraPitch, CameraYaw, 0.f).Vector() * ArmLength;
+}
+
+void AMapachePlayer::ToogleInventory()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+
+	if (!PC || !InventoryWidget) return;
+
+	if (!bInventoryVisible)
+	{
+		OpenInventory(PC);
+		return;
+	}
+	CloseInventory(PC);
+}
+
+void AMapachePlayer::ChoseInventory(int32 Location)
+{
+    UE_LOG(LogTemp, Warning, TEXT("Seleccionando %i"), Location);
+
+    APlayerController* PC = Cast<APlayerController>(GetController());
+
+    if (!PC || !InventoryWidget || !InventoryComponent)
+    {
+        UE_LOG(LogTemp, Error, TEXT("Faltan referencias para seleccionar el item"));
+        return;
+    }
+
+    CurrentItem = InventoryComponent->GetItemByIndex(Location);
+
+    if (!CurrentItem)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("No se encontro un item en esa posicion"));
+        return;
+    }
+
+    if (CurrentInventoryWidget)
+    {
+		ShowInventory();
+    }
+
+    CloseInventory(PC);
+}
+
+void AMapachePlayer::OpenInventory(APlayerController* PC)
+{
+	InventoryWidget->RefreshInventory(InventoryComponent);
+
+	InventoryWidget->SetVisibility(ESlateVisibility::Visible);
+
+	PC->bShowMouseCursor = true;
+
+	PC->SetIgnoreMoveInput(true);
+	PC->SetIgnoreLookInput(true);
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(InventoryWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+
+	PC->SetInputMode(InputMode);
+	bInventoryVisible = true;
+}
+
+void AMapachePlayer::CloseInventory(APlayerController* PC)
+{
+	InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
+
+	PC->bShowMouseCursor = false;
+
+	PC->SetIgnoreMoveInput(false);
+	PC->SetIgnoreLookInput(false);
+
+	PC->SetInputMode(FInputModeGameOnly());
+	bInventoryVisible = false;
+}
+
+void AMapachePlayer::ShowInventory()
+{
+	CurrentInventoryWidget->RefreshCurrentInventory(CurrentItem);
+	CurrentInventoryWidget->SetVisibility(ESlateVisibility::Visible);
+}
+
+void AMapachePlayer::HideInventory()
+{
+	CurrentInventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
+}
+
+void AMapachePlayer::DoSomething()
+{
+	if (!CurrentItem)
+	{
+		return;
+	}
+
+	if (CurrentItem.GetInterface())
+	{
+		CurrentItem->Interact(this);
+	}
+
+	if (InventoryComponent)
+	{
+		InventoryComponent->RemoveItem(CurrentItem);
+	}
+
+	CurrentItem = TScriptInterface<IItemInterface>();
+	ShowInventory();
+}
+
+int32 AMapachePlayer::GetMaxSlots()
+{
+	if (!InventoryComponent) {
+		return 0;
+	}
+	return InventoryComponent->MaxSlots;
+}
+
+int32 AMapachePlayer::GetAvaibleInventory() {
+	return GetMaxSlots() - InventoryComponent->Items.Num();
+}
+
+void AMapachePlayer::AddItemToInventory(TScriptInterface<IItemInterface> Item)
+{
+	if (!InventoryComponent || !Item) return;
+	InventoryComponent->AddItem(Item);
+}
+
+void AMapachePlayer::OnObjectBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	UE_LOG(LogTemp, Warning, TEXT("Detectando algo"));
 }
 
 void AMapachePlayer::UpdateOcclusion()
